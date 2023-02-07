@@ -23,6 +23,7 @@ localparam CAL   = 3'd1;
 localparam WRITE = 3'd2;
 localparam FINISH = 3'd3;
 localparam MAC_HOLD = 3'd4;
+localparam IDLE2 = 3'd5;
 // mat_A
 // reg [0:0] buf_a_0; // offset is 0
 reg [`DATA_SIZE*off_1-1:0] buf_a_1;
@@ -90,7 +91,19 @@ wire out_limit = (out_n || out_m);
 wire                           [0:31] from_top__net [0:4];
 wire                           [0:31] from_left_net [0:4];
 wire                           [31:0] multi_out_net [0:3];
-wire systolic_array_rst = ((state==CAL&&cnt==5'd0)||rst||state==IDLE);
+//wire systolic_array_rst = ((state==CAL&&cnt==5'd0)||rst||state==IDLE);
+reg systolic_array_rst;
+
+always @(posedge clk or posedge rst) begin
+  	if(rst) systolic_array_rst <= 1;
+	else begin
+	//	if(state==IDLE) systolic_array_rst <= 1;
+		if(state==IDLE2) systolic_array_rst <= 0;
+		//if(state==WRITE&&cnt==5'd4) systolic_array_rst <= 1;
+		if(next_state==IDLE2) systolic_array_rst <= 1;
+	end
+end
+
 /*
 assign from_top__net[0][24:31] = (cnt > {1'd0,k}+5'd1||state!=CAL||cnt==5'd0) ? 8'd0 : out_b[31:24];
 assign from_top__net[0][0:23] = {buf_b_3[7:0],buf_b_2[7:0],buf_b_1};
@@ -99,10 +112,10 @@ assign from_left_net[0][24:31] = (cnt > {1'd0,k}+5'd1||state!=CAL||cnt==5'd0) ? 
 assign from_left_net[0][0:23] = {buf_a_3[7:0],buf_a_2[7:0],buf_a_1};
 */
 
-assign from_top__net[0][0:7] = (((cnt >= {1'd0,k}+5'd1)&&state==CAL)||state!=CAL||cnt==5'd0||state==IDLE) ? 8'd0 : out_b[31:24];
+assign from_top__net[0][0:7] = (((cnt >= {1'd0,k}+5'd1)&&state==CAL)||state!=CAL||(cnt==5'd0&&state==CAL)||state==IDLE) ? 8'd0 : out_b[31:24];
 assign from_top__net[0][8:31] = (state!=CAL||state==IDLE) ? 24'd0 : {buf_b_1,buf_b_2[7:0],buf_b_3[7:0]};
 
-assign from_left_net[0][0:7] = (((cnt >= {1'd0,k}+5'd1)&&state==CAL)||state!=CAL||cnt==5'd0||state==IDLE) ? 8'd0 : out_a[31:24];
+assign from_left_net[0][0:7] = (((cnt >= {1'd0,k}+5'd1)&&state==CAL)||state!=CAL||(cnt==5'd0&&state==CAL)||state==IDLE) ? 8'd0 : out_a[31:24];
 assign from_left_net[0][8:31] = (state!=CAL||state==IDLE) ? 24'd0 : {buf_a_1,buf_a_2[7:0],buf_a_3[7:0]};
 
 
@@ -165,8 +178,8 @@ always @(posedge clk or posedge rst) begin
     else begin
         case(state)
             CAL:begin
-                //if(cnt == {1'd0,k} + 5'd8)begin
-				if((k>4'd4&&cnt== {1'd0,k} + 5'd4)||k<=4'd4&&cnt=={k,1'd0}+4'd4)begin //not sure???
+                if(cnt == {1'd0,k} + 5'd7)begin
+				//if((k>4'd4&&cnt== {1'd0,k} + 5'd4)||k<=4'd4&&cnt=={k,1'd0}+5'd4)begin //not sure???
 					cnt <= 5'd0;
                 end
 				else  cnt <= cnt+5'd1;
@@ -215,10 +228,10 @@ always @(posedge clk or posedge rst) begin
 
 				addr_c <= last_addr_c + cnt;
 			  
-				in_c[31:24] <= multi_out_net[cnt[3:0]][7 :0 ];
-	            in_c[23:16] <= multi_out_net[cnt[3:0]][15:8 ];
-    	        in_c[15:8 ] <= multi_out_net[cnt[3:0]][23:16];
-        	    in_c[7 :0 ] <= multi_out_net[cnt[3:0]][31:24];
+				in_c[31:24] <= multi_out_net[cnt[1:0]][7 :0 ];
+	            in_c[23:16] <= multi_out_net[cnt[1:0]][15:8 ];
+    	        in_c[15:8 ] <= multi_out_net[cnt[1:0]][23:16];
+        	    in_c[7 :0 ] <= multi_out_net[cnt[1:0]][31:24];
             end
 			FINISH:begin
 				wr_en_c <= 0;
@@ -241,13 +254,14 @@ always @(*) begin
   else begin
     next_state = state;
     case (state)
-      IDLE:  if(start) next_state = CAL;
-     // CAL:   if(cnt == {1'd0,k} + 5'd8) next_state = WRITE;
-	  CAL:    if((k>4'd4&&cnt== {1'd0,k} + 5'd3)||k<=4'd4&&cnt=={k,1'd0}+4'd3) next_state = WRITE; //MAC_HOLD;
+      IDLE:  next_state = IDLE2;  //CAL;
+      IDLE2: next_state = CAL;
+	  CAL:   if(cnt == {1'd0,k} + 5'd7) next_state = WRITE;
+	 // CAL:    if((k>4'd4&&cnt== {1'd0,k} + 5'd3)||k<=4'd4&&cnt=={k,1'd0}+4'd3) next_state = WRITE; //MAC_HOLD;
 	  //MAC_HOLD: next_state = WRITE;
 	  WRITE:begin
 	  	if(cnt==5'd4&&cnt_m==rnd_m-1&&cnt_n==rnd_n-1) next_state = FINISH;
-      	else if(cnt==5'd4)next_state = CAL;
+      	else if(cnt==5'd4)next_state = IDLE2;  //CAL;
       end	
 	  FINISH: next_state = FINISH;
     endcase
