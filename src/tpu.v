@@ -22,6 +22,7 @@ localparam IDLE  = 3'd0;
 localparam CAL   = 3'd1;
 localparam WRITE = 3'd2;
 localparam FINISH = 3'd3;
+localparam MAC_HOLD = 3'd4;
 // mat_A
 // reg [0:0] buf_a_0; // offset is 0
 reg [`DATA_SIZE*off_1-1:0] buf_a_1;
@@ -98,10 +99,10 @@ assign from_left_net[0][24:31] = (cnt > {1'd0,k}+5'd1||state!=CAL||cnt==5'd0) ? 
 assign from_left_net[0][0:23] = {buf_a_3[7:0],buf_a_2[7:0],buf_a_1};
 */
 
-assign from_top__net[0][0:7] = (cnt >= {1'd0,k}+5'd1||state!=CAL||cnt==5'd0||state==IDLE) ? 8'd0 : out_b[31:24];
+assign from_top__net[0][0:7] = (((cnt >= {1'd0,k}+5'd1)&&state==CAL)||state!=CAL||cnt==5'd0||state==IDLE) ? 8'd0 : out_b[31:24];
 assign from_top__net[0][8:31] = (state!=CAL||state==IDLE) ? 24'd0 : {buf_b_1,buf_b_2[7:0],buf_b_3[7:0]};
 
-assign from_left_net[0][0:7] = (cnt >= {1'd0,k}+5'd1||state!=CAL||cnt==5'd0||state==IDLE) ? 8'd0 : out_a[31:24];
+assign from_left_net[0][0:7] = (((cnt >= {1'd0,k}+5'd1)&&state==CAL)||state!=CAL||cnt==5'd0||state==IDLE) ? 8'd0 : out_a[31:24];
 assign from_left_net[0][8:31] = (state!=CAL||state==IDLE) ? 24'd0 : {buf_a_1,buf_a_2[7:0],buf_a_3[7:0]};
 
 
@@ -144,6 +145,7 @@ reg [`GBUFF_INDX_SIZE-1:0] last_addr_a,last_addr_b,last_addr_c;	//8 bit
 
 always @(posedge clk or posedge rst) begin
     if(rst)begin
+		done <= 0;
 		in_a <= 32'd0;
 		in_b <= 32'd0;
 		in_c <= 32'd0;
@@ -164,7 +166,7 @@ always @(posedge clk or posedge rst) begin
         case(state)
             CAL:begin
                 //if(cnt == {1'd0,k} + 5'd8)begin
-				if((k>4'd4&&cnt== {1'd0,k} + 5'd3)||k<=4'd4&&cnt=={k,1'd0}+4'd3)begin //not sure???
+				if((k>4'd4&&cnt== {1'd0,k} + 5'd4)||k<=4'd4&&cnt=={k,1'd0}+4'd4)begin //not sure???
 					cnt <= 5'd0;
                 end
 				else  cnt <= cnt+5'd1;
@@ -241,8 +243,9 @@ always @(*) begin
     case (state)
       IDLE:  if(start) next_state = CAL;
      // CAL:   if(cnt == {1'd0,k} + 5'd8) next_state = WRITE;
-	  CAL:    if((k>4'd4&&cnt== {1'd0,k} + 5'd3)||k<=4'd4&&cnt=={k,1'd0}+4'd3)next_state = WRITE;
-  	  WRITE:begin
+	  CAL:    if((k>4'd4&&cnt== {1'd0,k} + 5'd3)||k<=4'd4&&cnt=={k,1'd0}+4'd3) next_state = WRITE; //MAC_HOLD;
+	  //MAC_HOLD: next_state = WRITE;
+	  WRITE:begin
 	  	if(cnt==5'd4&&cnt_m==rnd_m-1&&cnt_n==rnd_n-1) next_state = FINISH;
       	else if(cnt==5'd4)next_state = CAL;
       end	
