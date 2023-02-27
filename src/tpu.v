@@ -105,38 +105,18 @@ always @(posedge clk or posedge rst) begin
 end
 
 /*
-assign from_top__net[0][24:31] = (cnt > {1'd0,k}+5'd1||state!=CAL||cnt==5'd0) ? 8'd0 : out_b[31:24];
-assign from_top__net[0][0:23] = {buf_b_3[7:0],buf_b_2[7:0],buf_b_1};
-
-assign from_left_net[0][24:31] = (cnt > {1'd0,k}+5'd1||state!=CAL||cnt==5'd0) ? 8'd0 : out_a[31:24];
-assign from_left_net[0][0:23] = {buf_a_3[7:0],buf_a_2[7:0],buf_a_1};
-*/
-
 assign from_top__net[0][0:7] = (((cnt >= {1'd0,k}+5'd1)&&state==CAL)||state!=CAL||(cnt==5'd0&&state==CAL)||state==IDLE) ? 8'd0 : out_b[31:24];
 assign from_top__net[0][8:31] = (state!=CAL||state==IDLE) ? 24'd0 : {buf_b_1,buf_b_2[7:0],buf_b_3[7:0]};
 
 assign from_left_net[0][0:7] = (((cnt >= {1'd0,k}+5'd1)&&state==CAL)||state!=CAL||(cnt==5'd0&&state==CAL)||state==IDLE) ? 8'd0 : out_a[31:24];
 assign from_left_net[0][8:31] = (state!=CAL||state==IDLE) ? 24'd0 : {buf_a_1,buf_a_2[7:0],buf_a_3[7:0]};
-
-
-/*
-genvar i, j;
-generate 
-for(i=0; i<4; i=i+1) begin: sys_row // row
-    for(j=0; j<4; j=j+1) begin: sys_col // col
-    mac ul_mac(
-        .clk      (clk),
-        .reset    (systolic_array_rst),
-        .up_in    (from_top__net[i  ][j * 8 : j * 8+7] ),
-        .left_in  (from_left_net[j  ][i * 8 : i * 8+7] ),
-        .up_out   (from_top__net[i+1][j * 8 : j * 8+7] ), // move downward
-        .left_out (from_left_net[j+1][i * 8 : i * 8+7] ), // move right
-        .mat_out  (multi_out_net[i  ][31-(j * 8): 24-(j * 8)] )  // move downward
-    );
-    end
-end
-endgenerate
 */
+assign from_top__net[0][0:7] = (((cnt >= {1'd0,k}+5'd1)&&state==CAL)||state!=CAL||(cnt==5'd0&&state==CAL)) ? 8'd0 : out_b[31:24];
+assign from_top__net[0][8:31] = (state!=CAL) ? 24'd0 : {buf_b_1,buf_b_2[7:0],buf_b_3[7:0]};
+
+assign from_left_net[0][0:7] = (((cnt >= {1'd0,k}+5'd1)&&state==CAL)||state!=CAL||(cnt==5'd0&&state==CAL)) ? 8'd0 : out_a[31:24];
+assign from_left_net[0][8:31] = (state!=CAL) ? 24'd0 : {buf_a_1,buf_a_2[7:0],buf_a_3[7:0]};
+
 genvar i, j;
 generate 
 for(i=0; i<4; i=i+1) begin: sys_row // row
@@ -176,6 +156,12 @@ always @(posedge clk or posedge rst) begin
 		wr_en_c <= 0;
     end
     else begin
+		in_a <= 32'd0;
+		in_b <= 32'd0;
+		in_c <= 32'd0;
+		wr_en_a <= 0;
+		wr_en_b <= 0;
+		wr_en_c <= 0;
         case(state)
             CAL:begin
                 if(cnt == {1'd0,k} + 5'd7)begin
